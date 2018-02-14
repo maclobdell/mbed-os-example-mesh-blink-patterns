@@ -1,151 +1,37 @@
-# Blink Pattern example mesh application for Mbed OS
+# Blink Pattern - Thread mesh application for Mbed OS
 
 With this application, you can use the [mesh networking API](https://os.mbed.com/docs/latest/reference/mesh.html) that [Mbed OS](https://github.com/ARMmbed/mbed-os) provides.
 
-The application demonstrates a office/home alert system, where coded messages can be recorded on one devices (by pressing the button in a pattern) and all the rest of the devices in the mesh will received the pattern and start blinking it on their LEDs.
+The application demonstrates a office/home alert system, where coded messages can be recorded on any device (by pressing a button in a pattern) and all the rest of the devices in the mesh will received the pattern and start blinking it on their LEDs.
 
-The application can be built for the unsecure 6LoWPAN-ND or Thread network.
+The application uses two buttons and a tri-color LED with three inputs (one for each color).  
 
-See the [6LoWPAN overview](https://os.mbed.com/docs/latest/tutorials/mesh.html) for the definition of star and mesh networks. These same principles apply also to Thread protocol.
+One button changes the LED color (red, green, or blue).  
+
+The other button, when pressed in a pattern (think, "shave and a hair cut, two bits"), will cause the pattern timing (time between presses) to be stored, then repeated back by blinking the pattern on the LED.   The pattern has a maximum of 20 blinks.  
+
+The application has been configured for Thread networks.
+
+The application is based on https://github.com/ARMmbed/mbed-os-example-mesh-minimal.
 
 ## Setup
 
 ### Download the application
 
 ```
-mbed import mbed-os-example-mesh-minimal
-cd mbed-os-example-mesh-minimal
+mbed import https://github.com/maclobdell/mbed-os-example-mesh-blink-patterns
+cd mbed-os-example-mesh-blink-patterns
 ```
 
-### Change the channel settings (optional)
-
-See the file `mbed_app.json` for an example of defining an IEEE 802.15.4 channel to use.
-
-### Selecting optimal Nanostack configuration
-
-To optimize the flash usage, select a proper configuration for Nanostack. The configuration depends mostly on the preferred use case.
-
-Select the protocol the network is based on:
-
-- 6LoWPAN-ND.
-- Thread.
-
-Select the device role:
-
-- Mesh network. A router. (default)
-- Star network. Nonrouting device. Also known as a host or sleepy host.
-
-Modify your `mbed_app.json` file to see which Nanostack and [Mbed Mesh API](https://github.com/ARMmbed/mbed-os/blob/master/features/nanostack/FEATURE_NANOSTACK/mbed-mesh-api/README.md) configuration to use.
-
-Example configuration files are provide under `configs/` directory. You may override the `mbed_app.json` with either of these.
-
-|configuration file|Use for|
-|------------------|-------|
-|`configs/mesh_6lowpan.json` | 6LoWPAN-ND based mesh network. |
-|`configs/mesh_thread.json` | Thread based mesh network. |
-
-An example of the `mbed_app.json` file:
-
-```
-...
-        "mesh-type":{
-            "help": "options are MESH_LOWPAN, MESH_THREAD",
-            "value": "MESH_LOWPAN"
-        }
-    },
-    "target_overrides": {
-        "*": {
-            "target.features_add": ["NANOSTACK", "COMMON_PAL"],
-            "nanostack.configuration": "lowpan_router",
-            "mbed-mesh-api.6lowpan-nd-device-type": "NET_6LOWPAN_ROUTER",
-            "mbed-mesh-api.thread-device-type": "MESH_DEVICE_TYPE_THREAD_ROUTER",
-            "mbed-mesh-api.heap-size": 32000,
-            "mbed-trace.enable": false
-        }
-    }
-```
-
-The following tables show the values to use in the `mbed_app.json` file for your devices in different networks.
-
-- For a 6LoWPAN-ND based network, use `mesh-type: MESH_LOWPAN`.
-- For a Thread-based network, use `mesh-type: MESH_THREAD`.
-
-#### 6LoWPAN-ND
-
-**mesh-type: MESH_LOWPAN**
-
-|Device role|`nanostack.configuration` value|`mbed-mesh-api.6lowpan-nd-device-type`|
-|-----------|-------------------------|------------------------------------|
-|Mesh router (default) | lowpan_router | NET_6LOWPAN_ROUTER |
-|Nonrouting device | lowpan_host | NET_6LOWPAN_HOST |
-
-#### Thread
-
-**mesh-type: MESH_THREAD**
-
-|Device role|`nanostack.configuration` value|`mbed-mesh-api.thread-device-type`|
-|-----------|-------------------------|------------------------------------|
-|Mesh router (default) | thread_router | MESH_DEVICE_TYPE_THREAD_ROUTER |
-|Nonrouting device | thread_end_device | MESH_DEVICE_TYPE_THREAD_SLEEPY_END_DEVICE |
 
 ##### Thread commissioning
 
 By default, the Thread application uses the static network link configuration defined in the [mesh API configuration file](https://github.com/ARMmbed/mbed-os/blob/master/features/nanostack/FEATURE_NANOSTACK/mbed-mesh-api/mbed_lib.json).
 If you want to use the Thread commissioning, see [how to commission a Thread device in practice](https://os.mbed.com/docs/latest/tutorials/mesh.html#how-to-commission-a-thread-device-in-practice)
 
-### Requirements for hardware
-
-The networking stack used in this example requires TLS functionality to be enabled on Mbed TLS.
-On devices where hardware entropy is not present, TLS is disabled by default. This results in compile time failures or linking failures.
-
-To learn why entropy is required, read the [TLS Porting guide](https://docs.mbed.com/docs/mbed-os-handbook/en/5.2/advanced/tls_porting/).
-
-See [Notes on different hardware](https://github.com/ARMmbed/mbed-os-example-mesh-minimal/blob/master/Hardware.md) for known combinations of development boards and RF shields that have been tested.
-
-You also need to check how LEDs and buttons are configured for your hardware, and update .json accordingly.
-
-### Changing the radio driver
-
-To run a 6LoWPAN-ND network, you need a working RF driver for Nanostack. This example uses the Atmel AT86RF233 by default.
-
-To change the RF driver modify the `mbed_app.json` file. For example,
-
-```json
-    "radio-type":{
-        "help": "options are ATMEL, MCR20, NCS36510, KW24D",
-        "value": "ATMEL"
-    },
-```
-
-### Compile the application
-
-```
-mbed compile -m K64F -t GCC_ARM
-```
-
-A binary is generated in the end of the build process.
-
-### Connect the RF shield to the board
-
-We are using the Atmel AT86RF233, which you can [purchase](https://firefly-iot.com/product/firefly-arduino-shield-2-4ghz/). Place the shield on top of your board, and power it up.
-
-### Program the target
-
-Drag and drop the binary to the target to program the application.
-
-### Update the firmware of the border router
-
-This example supports the following border router:
-
-- [Nanostack-border-router](https://github.com/ARMmbed/nanostack-border-router).
-
-The border router supports static and dynamic backhaul configuration. The static configuration is good for testing, but the dynamic one works if your network infrastructure is supplying an IPv6 address. Make sure that you use the appropiate mode.
-
-Remember to connect the Ethernet cable between the border router and your home/office router. Then power on the board.
-
 ## Testing
 
-By default the application is built for the LED blink pattern demo, in which the device sends a multicast message to all devices in the network when the button is pressed. All devices that receive the multicast message will change the LED blink pattern to the state defined in the message. Note, that the Thread devices can form a network without the existance of the border router. The following applies only to the case when the border router is set-up.
+By default the application is built for the LED blink pattern demo, in which the device sends a multicast message to all devices in the network when the button is pressed. All devices that receive the multicast message will change the LED blink pattern to the state defined in the message. Note, that the Thread devices can form a network without the existence of the border router. The following applies only to the case when the border router is set-up.
 
 As soon as both the border router and the target are up and running you can verify the correct behaviour. Open a serial console and see the IP address obtained by the device.
 
