@@ -1,8 +1,9 @@
-# Example mesh application for Mbed OS
+# Blink Pattern example mesh application for Mbed OS
 
 With this application, you can use the [mesh networking API](https://os.mbed.com/docs/latest/reference/mesh.html) that [Mbed OS](https://github.com/ARMmbed/mbed-os) provides.
 
-The application demonstrates a light control application, where devices can control the LED status of all devices in the network.
+The application demonstrates a office/home alert system, where coded messages can be recorded on one devices (by pressing the button in a pattern) and all the rest of the devices in the mesh will received the pattern and start blinking it on their LEDs.
+
 The application can be built for the unsecure 6LoWPAN-ND or Thread network.
 
 See the [6LoWPAN overview](https://os.mbed.com/docs/latest/tutorials/mesh.html) for the definition of star and mesh networks. These same principles apply also to Thread protocol.
@@ -144,7 +145,7 @@ Remember to connect the Ethernet cable between the border router and your home/o
 
 ## Testing
 
-By default the application is built for the LED control demo, in which the device sends a multicast message to all devices in the network when the button is pressed. All devices that receive the multicast message will change the LED status (red LED on/off) to the state defined in the message. Note, that the Thread devices can form a network without the existance of the border router. The following applies only to the case when the border router is set-up.
+By default the application is built for the LED blink pattern demo, in which the device sends a multicast message to all devices in the network when the button is pressed. All devices that receive the multicast message will change the LED blink pattern to the state defined in the message. Note, that the Thread devices can form a network without the existance of the border router. The following applies only to the case when the border router is set-up.
 
 As soon as both the border router and the target are up and running you can verify the correct behaviour. Open a serial console and see the IP address obtained by the device.
 
@@ -168,9 +169,9 @@ The custom Mbed TLS configuration can be set by adding `"macros": ["MBEDTLS_USER
 
 This configuration file saves you 8.7 kB of RAM but uses 6.8 kB of more flash.
 
-### Disabling the LED control example
+### Disabling the LED blink pattern example
 
-You can disable the LED control example by specifying `enable-led-control-example": false` in the `mbed_app.json`
+You can disable the LED blink pattern example by specifying `enable-led-control-example": false` in the `mbed_app.json`
 
 This saves you about 2.5 kB of flash.
 
