@@ -19,6 +19,9 @@
             "mbed-trace.enable": false,
             "mbed-mesh-api.heap-size": 30000,
             "mbed-mesh-api.thread-device-type": "MESH_DEVICE_TYPE_THREAD_ROUTER",
+            "mbed-mesh-api.thread-config-panid": "0x0777",
+            "mbed-mesh-api.thread-master-key": "{0x77, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}",
+            "mbed-mesh-api.thread-config-channel": 22,            
             "platform.stdio-convert-newlines": true,
             "platform.stdio-baud-rate": 115200
         },
