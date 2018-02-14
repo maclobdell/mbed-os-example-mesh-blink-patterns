@@ -18,8 +18,15 @@
 
 #include "NetworkInterface.h"
 
-void start_mesh_led_control_example(NetworkInterface * interface);
-void start_blinking();
-void cancel_blinking();   
+void start_mesh_led_blink_pattern_example(NetworkInterface * interface);
+void set_led_off(void);
+void set_led_on(void);
+void set_led_color(uint8_t);
+   
+#define LED_COLOR_RED 1
+#define LED_COLOR_GREEN 2
+#define LED_COLOR_BLUE 3
+#define LED_OFF 1
+#define LED_ON 0
    
 #endif

@@ -20,7 +20,7 @@
 #include "mesh_nvm.h"
 
 #if MBED_CONF_APP_ENABLE_LED_CONTROL_EXAMPLE
-#include "mesh_led_control_example.h"
+#include "mesh_led_blink_pattern_example.h"
 #endif
 
 void trace_printer(const char* str) {
@@ -76,22 +76,28 @@ int main()
     printf("Start mesh-minimal application\n");
     printf("Build: %s %s\nMesh type: %d\n", __DATE__, __TIME__, MBED_CONF_APP_MESH_TYPE);
 
-#if MBED_CONF_APP_ENABLE_LED_CONTROL_EXAMPLE
-    if (MBED_CONF_APP_BUTTON != NC && MBED_CONF_APP_LED != NC) {
-        start_blinking();
-    } else {
-        printf("pins not configured. Skipping the LED control.\n");
-    }
-#endif
+    //SET LED COLOR BLUE
+    set_led_color(LED_COLOR_BLUE);
+    set_led_on();
+            
     printf("\n\nConnecting...\n");
     mesh.initialize(&rf_phy);
     mesh_nvm_initialize();
     int error = mesh.connect();
     if (error) {
         printf("Connection failed! %d\n", error);
+        //SET LED COLOR RED - OH NO!
+        set_led_color(LED_COLOR_RED);
+        set_led_on();
+  
         return error;
+    }else {
+      //SET LED COLOR GREEN - SUCCESS!
+      set_led_color(LED_COLOR_GREEN);
+      set_led_on();
+      
     }
-
+    
     while (NULL == mesh.get_ip_address())
         Thread::wait(500);
 
@@ -99,9 +105,6 @@ int main()
 
 #if MBED_CONF_APP_ENABLE_LED_CONTROL_EXAMPLE
     // Network found, start socket example
-    if (MBED_CONF_APP_BUTTON != NC && MBED_CONF_APP_LED != NC) {
-        cancel_blinking();
-        start_mesh_led_control_example((NetworkInterface *)&mesh);
-    }
+    start_mesh_led_blink_pattern_example((NetworkInterface *)&mesh);
 #endif
 }
