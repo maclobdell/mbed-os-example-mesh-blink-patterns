@@ -23,9 +23,12 @@
 static void init_socket();
 static void handle_socket();
 static void receive();
-static void send_message();
-static void update_state(uint32_t* pattern, uint8_t color);
+static void send_sync(uint8_t sync_num);
+
+static void update_state(uint8_t blink_set);
 static void handle_message(char* msg);
+static void master_loop_blocking(void);
+static void slave_func(void);
 
 #define multicast_addr_str "ff15::810a:64d1"
 #define TRACE_GROUP "example"
@@ -34,14 +37,8 @@ static void handle_message(char* msg);
 #define MASTER_GROUP 0
 #define MY_GROUP 1
 
-#define APP_MASTER 1 
+#define APP_MASTER 1
 
-static void sw_handler(void);
-static void sw_color_handler(void);
-InterruptIn sw(SW1);
-InterruptIn sw_color(SW3);
-
-Thread blinker_thread;
 Thread eventThread;
 
 DigitalOut led_red(LED_RED, 1);
@@ -53,8 +50,22 @@ uint8_t led_color;
 /* global variabls for button recording */
 Timer timer;
 uint8_t recording = 0;
-uint32_t blinkTiming[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint32_t blinkTiming[20] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  
 
+uint32_t blinkSets[10] [20] ={                             
+                            {100,100,100,100,100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},   
+                            {200,200,200,200,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}, 
+                            {300,300,300,300,300,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},  
+                            {400,300,200,100,200,300,400,0,0,0,0,0,0,0,0,0,0,0,0,0},   
+                            {200,200,400,400,200,200,0,0,0,0,0,0,0,0,0,0,0,0,0,0},   
+                            {300,300,300,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},   
+                            {100,200,300,400,100,200,300,400,0,0,0,0,0,0,0,0,0,0,0,0},  
+                            {200,200,200,200,200,200,200,200,0,0,0,0,0,0,0,0,0,0,0,0},
+                            {300,300,300,300,300,300,300,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                            {200,300,200,300,200,300,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+                            };
+uint8_t blinkSets_color[10] = {2,3,1,2,3,2,3,1,2,3};
+uint8_t sync_signal = 0xF;
 
 uint8_t blinkCount = 0;  //starts at 0 for first knock
 uint32_t startTime;
@@ -64,6 +75,7 @@ NetworkInterface * network_if;
 UDPSocket* my_socket;
 // queue for sending messages from button press.
 EventQueue queue;
+
 // for LED blinking
 Ticker ticker;
 // Handle for delayed message send
@@ -73,50 +85,7 @@ uint8_t multi_cast_addr[16] = {0};
 uint8_t receive_buffer[200];
 // how many hops the multicast message can go
 static const int16_t multicast_hops = 10;
-bool button_status = 0;
 
-
-void sw_handler(void) {
-
-  if(recording ==0)
-    {
-      //this is the first button press
-      blinkCount = 0;
-      //led1 = 1; //turn off led
-      set_led_off();
-      
-      for(uint8_t i = 0; i<20; i++)
-      {
-        blinkTiming[i] = 0;
-      }
-      recording = 1;
-      timer.start();
-      timer.reset();
-      startTime = timer.read_ms();
-
-    }else if(recording == 1)
-    {
-      //this is not the first button press
-      uint32_t now;
-      now = timer.read_ms();
-      blinkTiming[blinkCount] = (now - startTime);
-      blinkCount++;
-      startTime = now;  //start time for next period
-    }
-
-}
-
-void sw_color_handler(void)
-{
-  //change color
-  led_color++;
-  
-   if (led_color > 3)
-   {
-     led_color = 1;
-   }
-  
-}
 
 void start_mesh_led_blink_pattern_example(NetworkInterface * interface)
 {
@@ -127,58 +96,73 @@ void start_mesh_led_blink_pattern_example(NetworkInterface * interface)
   stoip6(multicast_addr_str, strlen(multicast_addr_str), multi_cast_addr);
   init_socket();
 
-  sw.mode(PullUp);
-  sw.fall(sw_handler);
-  sw_color.mode(PullUp);
-  sw_color.fall(sw_color_handler);
-  
-    recording = 0;
-              
-    while(1)
-    {
-        if(recording==1)
-        {
-            if (blinkCount >= 20 || timer.read_ms() > 5000)  //max presses reached or 5 sec elapsed - done recording
-            {
-              timer.stop();
-              /* re-initialize all variables */
-              recording = 0;
-              blinkCount = 0;
-              
-              #if APP_MASTER
-                //send pattern to slaves
-                queue.call(send_message);
-              #endif
-              
-            }
-        }else if(recording == 0)
-        {
-            while(recording == 0)
-            {
-              for(uint8_t i = 0;i < 20; i++)
-              {
-                //blink led
-                //led1 = 0;
-                set_led_on();
-                Thread::wait(20);
-                //led1 = 1;
-                set_led_off();                
-                Thread::wait(blinkTiming[i]);
-                if(blinkTiming[i] == 0){
-                  break;
-                }
-  
-              }
-              Thread::wait(2000);
-            }
-  
-        }
-    
+#if APP_MASTER
+    master_loop_blocking(); 
+#endif    
       
-    }
-
 }
 
+void master_loop_blocking(void)
+{
+  while(1)
+  {
+    
+    for(uint8_t m = 0; m < 10; m++)
+    {  //for each blink pattern 
+
+      printf("updating state %d\r\n",m);
+      update_state(m);       
+           
+      //go through cycle 3 times
+      for(uint8_t k = 0; k < 3; k++)
+      {
+        printf("sending sync\r\n");
+        queue.call(send_sync,m);
+        
+        Thread::wait(80);  //wait approx time for sync to reach other devices
+                    
+          //for each value in pattern
+          for(uint8_t i = 0;i < 20; i++)
+          {
+            //blink led
+            //led1 = 0;
+            set_led_on();
+            Thread::wait(20);
+            //led1 = 1;
+            set_led_off();                
+            Thread::wait(blinkTiming[i]);
+            if(blinkTiming[i] == 0){
+              break;
+            }
+
+          }  
+          Thread::wait(2000);
+      }          
+   }   
+ }
+  
+}
+
+void slave_func(void)
+{
+    //for each value in pattern
+    for(uint8_t i = 0;i < 20; i++)
+    {
+      //blink led
+      //led1 = 0;
+      set_led_on();
+      Thread::wait(20);
+      //led1 = 1;
+      set_led_off();                
+      Thread::wait(blinkTiming[i]);
+      if(blinkTiming[i] == 0){
+        break;
+      }
+
+    }  
+
+}      
+  
 void set_led_color(uint8_t color)
 {
     if(color > 0 && color < 4){
@@ -212,13 +196,13 @@ void set_led_on(void)
     }           
 }
 
-static void send_message() {
+
+static void send_sync(uint8_t sync_num) {
     
     //tr_debug("send msg");
-    printf("send msg\r\n");
+    printf("send sync\r\n");
         
     char buf[200];
-    char blink_string[100];
     int length;
 
     /**
@@ -226,29 +210,19 @@ static void send_message() {
     * <field identifier>:<value> pairs.
     *
     * Light control message format:
-    * t:lights;g:<group_id>;c:<1|2|3>;p:a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t\0
+    * sync:1,2,3,4,5,6,7,7,9
     */
     
     for(uint8_t j = 0;j < 200; j++)
     {      
       buf[j] = 0;   //clear memory
     }
-    for(uint8_t j = 0;j < 100; j++)
-    {
-      blink_string[j] = 0; //clear memory
-    }        
-    //construct the string of blink pattern              
-    for(uint8_t j = 0;j < 20; j++)
-    {      
-      snprintf(blink_string, sizeof(blink_string), "%s%d ", blink_string, blinkTiming[j]);   //concatenate
-    }
-    printf("blink string %s\r\n", blink_string);
     
-    length = snprintf(buf, sizeof(buf), "t:lights;g:%03d;c:%d;p:%s", MY_GROUP, led_color, blink_string) + 1;
+    length = snprintf(buf, sizeof(buf), "t:lights;g:%03d;sync:%01d", MY_GROUP, sync_num) + 1;
     
     MBED_ASSERT(length > 0);
     //tr_debug("Sending lightcontrol message, %d bytes: %s", length, buf);
-    printf("Sending lightcontrol message, %d bytes: %s\r\n", length, buf);
+    printf("Sending msg, %d bytes: %s\r\n", length, buf);
     
     SocketAddress send_sockAddr(multi_cast_addr, NSAPI_IPv6, UDP_PORT);
     my_socket->sendto(send_sockAddr, buf, 200);
@@ -257,81 +231,36 @@ static void send_message() {
 }
 
 
-static void update_state(uint32_t* pattern, uint8_t color) {
+
+static void update_state(uint8_t blink_set) {
   
+  printf("updating state\r\n");
   recording = 1;
-  printf("storing new pattern\r\n");
-  set_led_color(color);
-  for(uint8_t j = 0;j < 20; j++)
+  set_led_color(blinkSets_color[blink_set]);
+   //initialize pattern      
+  for(uint8_t i = 0;i < 20; i++)
   {
-    blinkTiming[j] = pattern[j];
-    tr_debug("%d", blinkTiming[j]);
+      blinkTiming[i] = blinkSets[blink_set][i];
   }
-  printf("...done\r\n");  
   recording = 0;
     
 }
 
 static void handle_message(char* msg) {
     // Check if this is lights message
-    //uint8_t state=button_status;
+  
+#if APP_MASTER == 0
+  
     uint16_t group=0xffff;
-    uint32_t pattern[100];
-    uint8_t color;    
-    uint8_t pattern_received = 0;
+    uint8_t blink_set = 0;    
+    uint8_t stuff_received = 0;
 
-    printf("received msg %s\r\n",msg);
+  //  printf("received msg %s\r\n",msg);
         
     if (strstr(msg, "t:lights;") == NULL) {
        return;
     }
 
-    if (strstr(msg, "c:1;") != NULL) {
-        color = 1;
-    }
-    else if (strstr(msg, "c:2;") != NULL) {
-        color = 2;
-    }
-    else if (strstr(msg, "c:3;") != NULL) {
-        color = 3;
-    }
-    /* store button pattern here */
-    char *pattern_ptr = strstr(msg, "p:");
-    if (pattern_ptr) {
-       char *pEnd;
-        // parse string into pattern array
-        //printf("converting pattern to integers\r\n");
-        //printf("pattern_ptr = %s",pattern_ptr);
-
-       char *token;    
-       const char delimiters[] = " .,;:!-p";
-
-       char *rest = pattern_ptr;
-
-       for(uint8_t j = 0;j < 20; j++)
-        {
-          token = strtok_r(rest, delimiters, &rest); 
-        //  printf("%s\r\n",token);
-          pattern[j] = atoi(token);
-
-          /* validate integrity of pattern */
-          /* drop anything not a valid number in string */
-          if (pattern[j] < 0 || pattern[j] > 5000)
-          {
-             pattern[j] = 0;  
-          } 
-        }
-                
-        printf("received pattern:\n\r");
-        pattern_received = 1;
-        for(uint8_t j = 0;j < 20; j++)
-        { 
-          printf("%d\n\r", pattern[j]);
-    
-        }
-    }
-
-    
     // 0==master, 1==default group
     char *msg_ptr = strstr(msg, "g:");
     if (msg_ptr) {
@@ -339,14 +268,73 @@ static void handle_message(char* msg) {
         group = strtol(msg_ptr, &ptr, 10);
     }
 
+    if (strstr(msg, "sync:0") != NULL) {
+        sync_signal = 1;
+        blink_set = 0;
+        stuff_received = 1;
+    }
+    else if (strstr(msg, "sync:1") != NULL) {
+        sync_signal = 1;
+        blink_set = 1;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:2") != NULL) {
+        sync_signal = 1;
+        blink_set = 2;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:3") != NULL) {
+        sync_signal = 1;
+        blink_set = 3;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:4") != NULL) {
+        sync_signal = 1;
+        blink_set = 4;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:5") != NULL) {
+        sync_signal = 1;
+        blink_set = 5;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:6") != NULL) {
+        sync_signal = 1;
+        blink_set = 6;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:7") != NULL) {
+        sync_signal = 1;
+        blink_set = 7;     
+        stuff_received = 1;   
+    }    
+    else if (strstr(msg, "sync:8") != NULL) {
+        sync_signal = 1;
+        blink_set = 8;     
+        stuff_received = 1;   
+    }
+    else if (strstr(msg, "sync:9") != NULL) {
+        sync_signal = 1;
+        blink_set = 9;     
+        stuff_received = 1;   
+    }
+    
+    
     // in this example we only use one group
     if (group==MASTER_GROUP || group==MY_GROUP) {
-        if(pattern_received == 1)
+      
+        if(stuff_received == 1)
         {
-          update_state(pattern, color);
-          pattern_received = 0;
+          printf("received sync %d",blink_set);
+          stuff_received = 0;
+          update_state(blink_set);
+          queue.cancel(slave_handle);
+          slave_handle = queue.call(slave_func);
+          
         }
     }
+#endif    
+    
 }
 
 static void receive() {
@@ -358,13 +346,14 @@ static void receive() {
     while (something_in_socket) {
         int length = my_socket->recvfrom(&source_addr, receive_buffer, sizeof(receive_buffer) - 1);
         if (length > 0) {
-            int timeout_value = MESSAGE_WAIT_TIMEOUT;
-            printf("Packet from %s\r\n", source_addr.get_ip_address());
-            timeout_value += rand() % 30;
-            printf("Advertisiment after %d seconds\r\n", timeout_value);
-            queue.cancel(queue_handle);
-            queue_handle = queue.call_in((timeout_value * 1000), send_message);
+            //int timeout_value = MESSAGE_WAIT_TIMEOUT;
+            //printf("Packet from %s\r\n", source_addr.get_ip_address());
+            //timeout_value += rand() % 30;
+            //printf("Advertisiment after %d seconds\r\n", timeout_value);
+            //queue.cancel(queue_handle);
+            //queue_handle = queue.call_in((timeout_value * 1000), send_message);
             // Handle command
+          
             handle_message((char*)receive_buffer);
         }
         else if (length!=NSAPI_ERROR_WOULD_BLOCK) {
@@ -380,7 +369,8 @@ static void receive() {
 
 static void handle_socket() {
     // call-back might come from ISR
-    queue.call(receive);
+    
+       queue.call(receive);
 }
 
 static void init_socket()
@@ -402,6 +392,7 @@ static void init_socket()
     
     /* New - put queue in a thread, so main thread doesn't get blocked here */
      eventThread.start(callback(&queue, &EventQueue::dispatch_forever));
+      
      // dispatch forever
      //queue.dispatch();
   
