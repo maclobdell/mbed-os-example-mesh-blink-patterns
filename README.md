@@ -12,7 +12,7 @@ The other button, when pressed in a pattern (think, "shave and a hair cut, two b
 
 The application has been configured for Thread networks.
 
-The application is based on [mbed-os-example-mesh-minimal] (https://github.com/ARMmbed/mbed-os-example-mesh-minimal).
+The application is based on [mbed-os-example-mesh-minimal](https://github.com/ARMmbed/mbed-os-example-mesh-minimal).
 
 ## Setup
 
@@ -65,4 +65,4 @@ Memory optimizations will likely be required
 
 ## Memory optimizations
 
-For information on memory optimizations that might be required for different hardware, see [mbed-os-example-mesh-minimal] (https://github.com/ARMmbed/mbed-os-example-mesh-minimal).
+For information on memory optimizations that might be required for different hardware, see [mbed-os-example-mesh-minimal](https://github.com/ARMmbed/mbed-os-example-mesh-minimal).
